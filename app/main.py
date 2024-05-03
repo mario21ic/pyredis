@@ -1,5 +1,6 @@
 import socket
 
+PING = "*1\r\n$4\r\nping\r\n"
 RESPONSE = "+PONG\r\n"
 
 def main():
@@ -10,8 +11,9 @@ def main():
     conn, addr = server_socket.accept() # wait for client
     data = conn.recv(1024).decode() # read data from client
     print(data)
-    conn.sendall(f"{RESPONSE}".encode()) # send data to client
-    print("Response sent")
+    if data == PING:
+        conn.sendall(f"{RESPONSE}".encode()) # send data to client
+        print("Response sent")
 
 
 if __name__ == "__main__":

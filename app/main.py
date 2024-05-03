@@ -1,7 +1,7 @@
 import socket
 import asyncio
-import time
 import threading
+import argparse
 
 # PING = "*1\r\n$4\r\nping\r\n"
 PONG = "+PONG\r\n"
@@ -62,10 +62,17 @@ async def handle_client(client: socket.socket):
 
 async def main():
     print("Starting server...")
-    server = socket.create_server(("localhost", 6379), reuse_port=False)
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--port", type=int, default=6379)
+    args = parser.parse_args()
+    port = 6379
+    if args.port:
+        # print(f"port turned on: {args.port}")
+        port = args.port
+    server = socket.create_server(("localhost", port), reuse_port=False)
     server.setblocking(False)
     server.listen()
-    print("Listening on port 6379")
+    print(f"Listening on port {port}")
     loop = asyncio.get_event_loop()
     while True:
         client, _ = await loop.sock_accept(server)

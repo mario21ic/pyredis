@@ -4,7 +4,7 @@ import threading
 import argparse
 import sys
 
-# PING = "*1\r\n$4\r\nping\r\n"
+PING = "*1\r\n$4\r\nping\r\n"
 PONG = "+PONG\r\n"
 OK = "+OK\r\n"
 NULL = "$-1\r\n"
@@ -76,10 +76,16 @@ async def main():
         # print(f"port turned on: {args.port}")
         port = args.port
     
+    # Mode Replica
     if len(args.replicaof) > 0:
-        print(f"replicaof turned on: {args.replicaof}")
         global ROLE
         ROLE = "slave"
+        master_host, master_port = args.replicaof
+        print(f"ReplicaOf Host: {master_host} - port: {master_port}")
+        # Send Ping to Master
+        master_sock = socket.create_connection((master_host, int(master_port)))
+        master_sock.sendall(PING.encode())
+        master_sock.close()
 
     server = socket.create_server(("localhost", port), reuse_port=False)
     server.setblocking(False)

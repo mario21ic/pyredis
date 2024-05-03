@@ -1,10 +1,12 @@
 import socket
 import asyncio
-
+import time
+import threading
 
 # PING = "*1\r\n$4\r\nping\r\n"
 PONG = "+PONG\r\n"
 OK = "+OK\r\n"
+NULL = "$-1\r\n"
 KEY_VALUES = {}
 
 # https://redis.io/docs/latest/develop/reference/protocol-spec/#bulk-strings
@@ -12,6 +14,15 @@ def create_bulk_response(msg):
     bulk_resp = "$" + str(len(msg)) + "\r\n" + msg + "\r\n"
     print("bulk_resp", bulk_resp)
     return bulk_resp
+
+async def count_down(key: str, px: int = None):
+    def delete_key():
+        print("delete_key - time expired:", key)
+        if key in KEY_VALUES:
+            del KEY_VALUES[key]
+
+    timer = threading.Timer(px / 1000, delete_key)
+    timer.start()
 
 
 async def handle_client(client: socket.socket):
@@ -26,13 +37,27 @@ async def handle_client(client: socket.socket):
                 msg = req.decode().split("\r\n")[4]
                 await loop.sock_sendall(client, create_bulk_response(msg).encode())
             case "set":
+                print("msg: ", req.decode().split("\r\n"))
                 key = req.decode().split("\r\n")[4]
                 value = req.decode().split("\r\n")[6]
-                KEY_VALUES[key] = value
                 print(f"key: {key} - value: {value}")
+                KEY_VALUES[key] = value
+                if len(req.decode().split("\r\n")) > 8:
+                    if req.decode().split("\r\n")[8].lower() == "px":
+                        # param = req.decode().split("\r\n")[8]
+                        expiry = int(req.decode().split("\r\n")[10])
+                        print("expiry:", expiry)
+                        asyncio.create_task(count_down(key, expiry))
                 await loop.sock_sendall(client, OK.encode())
             case "get":
-                await loop.sock_sendall(client, create_bulk_response(KEY_VALUES.get(req.decode().split("\r\n")[4], "")).encode())
+                data = KEY_VALUES.get(req.decode().split("\r\n")[4], "")
+                print("data:", data)
+                if data != "":
+                    data = create_bulk_response(data)
+                else:
+                    # print("data not found - sending NULL response")
+                    data = NULL
+                await loop.sock_sendall(client, data.encode())
 
 
 async def main():

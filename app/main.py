@@ -46,7 +46,6 @@ async def handle_client(client: socket.socket):
                 KEY_VALUES[key] = value
                 if len(req.decode().split("\r\n")) > 8:
                     if req.decode().split("\r\n")[8].lower() == "px":
-                        # param = req.decode().split("\r\n")[8]
                         expiry = int(req.decode().split("\r\n")[10])
                         print("expiry:", expiry)
                         asyncio.create_task(count_down(key, expiry))
@@ -57,14 +56,12 @@ async def handle_client(client: socket.socket):
                 if data != "":
                     data = create_bulk_response(data)
                 else:
-                    # print("data not found - sending NULL response")
                     data = NULL
                 await loop.sock_sendall(client, data.encode())
             case "info":
                 param = req.decode().split("\r\n")[4]
-                # global ROLE
                 if param == "replication":
-                    await loop.sock_sendall(client, create_bulk_response("# Replication\r\nrole:" + ROLE).encode())
+                    await loop.sock_sendall(client, create_bulk_response(f"# Replication\r\nrole:{ROLE}\r\nmaster_replid:8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb\r\nmaster_repl_offset:0\r\n").encode())
 
 
 async def main():

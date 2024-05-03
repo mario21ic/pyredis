@@ -2,26 +2,24 @@ import socket
 import asyncio
 
 # PING = "*1\r\n$4\r\nping\r\n"
-RESPONSE = "+PONG\r\n"
+PONG = "+PONG\r\n"
 
-async def pong(client_socket: socket.socket, loop: asyncio.AbstractEventLoop):
-    while data := await loop.sock_recv(client_socket, 1024):
-        await loop.sock_sendall(client_socket, RESPONSE.encode())
-
-
-async def listen(server_socket: socket.socket, loop: asyncio.AbstractEventLoop):
-    while True:
-        client_socket, addr = await loop.sock_accept(server_socket)
-        client_socket.setblocking(False)
-        asyncio.create_task(pong(client_socket, loop))
-
+async def handle_client(client: socket.socket):
+    loop = asyncio.get_event_loop()
+    while req := await loop.sock_recv(client, 1024):
+        print("receibed request", req, client)
+        await loop.sock_sendall(client, PONG.encode())
 
 async def main():
     print("Starting server...")
-    server_socket = socket.create_server(("localhost", 6379), reuse_port=True)
-    server_socket.setblocking(False)
+    server = socket.create_server(("localhost", 6379), reuse_port=True)
+    server.setblocking(False)
+    server.listen()
+    print("Listening on port 6379")
     loop = asyncio.get_event_loop()
-    await listen(server_socket, loop)
+    while True:
+        client, _ = await loop.sock_accept(server)
+        loop.create_task(handle_client(client))
 
 
 if __name__ == "__main__":

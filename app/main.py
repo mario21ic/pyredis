@@ -10,18 +10,17 @@ OK = "+OK\r\n"
 NULL = "$-1\r\n"
 KEY_VALUES = {}
 ROLE = "master"
+REPL_ID = "8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb"
+REPL_OFFSET = 0
 
 # https://redis.io/docs/latest/develop/reference/protocol-spec/#bulk-strings
-def create_bulk_response(msg):
+def bulk_string(msg):
     bulk_resp = "$" + str(len(msg)) + "\r\n" + msg + "\r\n"
     print("bulk_resp", bulk_resp)
     return bulk_resp
 
 """
-# REPLCONF listening-port <PORT>
-*3\r\n$8\r\nREPLCONF\r\n$14\r\nlistening-port\r\n$4\r\n6380\r\n
-# REPLCONF capa psync2
-*3\r\n$8\r\nREPLCONF\r\n$4\r\ncapa\r\n$6\r\npsync2\r\n
+RESP Array
 https://redis.io/docs/latest/develop/reference/protocol-spec/#arrays
 """
 def bulk_array(text):
@@ -53,7 +52,7 @@ async def handle_client(client: socket.socket):
                 await loop.sock_sendall(client, PONG.encode())
             case "echo":
                 msg = req.decode().split("\r\n")[4]
-                await loop.sock_sendall(client, create_bulk_response(msg).encode())
+                await loop.sock_sendall(client, bulk_string(msg).encode())
             case "set":
                 print("msg: ", req.decode().split("\r\n"))
                 key = req.decode().split("\r\n")[4]
@@ -70,18 +69,20 @@ async def handle_client(client: socket.socket):
                 data = KEY_VALUES.get(req.decode().split("\r\n")[4], "")
                 print("data:", data)
                 if data != "":
-                    data = create_bulk_response(data)
+                    data = bulk_string(data)
                 else:
                     data = NULL
                 await loop.sock_sendall(client, data.encode())
             case "info":
                 param = req.decode().split("\r\n")[4]
                 if param == "replication":
-                    await loop.sock_sendall(client, create_bulk_response(f"# Replication\r\nrole:{ROLE}\r\nmaster_replid:8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb\r\nmaster_repl_offset:0\r\n").encode())
+                    await loop.sock_sendall(client, bulk_string(f"# Replication\r\nrole:{ROLE}\r\nmaster_replid:{REPL_ID}\r\nmaster_repl_offset:{REPL_OFFSET}\r\n").encode())
             case "replconf":
                 await loop.sock_sendall(client, OK.encode())
+            case "psync":
+                await loop.sock_sendall(client, bulk_string(f"+FULLRESYNC {REPL_ID} {REPL_OFFSET}\r\n").encode())
             case _:
-                await loop.sock_sendall(client, create_bulk_response("Command not found").encode())
+                await loop.sock_sendall(client, bulk_string("Command not found").encode())
 
 
 async def main():
@@ -112,15 +113,20 @@ async def main():
         if response.decode() == PONG:
             print("Master is alive")
             
-            replconf1 = f"REPLCONF listening-port {host_port}"
+            replconf1 = f"REPLCONF listening-port {host_port}" # *3\r\n$8\r\nREPLCONF\r\n$14\r\nlistening-port\r\n$4\r\n6380\r\n
             master_sock.sendall(bulk_array(replconf1).encode())
             response = master_sock.recv(1024)
-            print("response", response.decode())
+            # print("response", response.decode())
 
-            replconf2 = "REPLCONF capa psync2"
+            replconf2 = "REPLCONF capa psync2" # *3\r\n$8\r\nREPLCONF\r\n$4\r\ncapa\r\n$6\r\npsync2\r\n
             master_sock.sendall(bulk_array(replconf2).encode())
             response = master_sock.recv(1024)
-            print("response", response.decode())
+            # print("response", response.decode())
+
+            psync = "PSYNC ? -1" # *3\r\n$5\r\nPSYNC\r\n$1\r\n?\r\n$2\r\n-1\r\n
+            master_sock.sendall(bulk_array(psync).encode())
+            response = master_sock.recv(1024)
+            # print("response", response.decode())
         
         # Close connection
         master_sock.close()

@@ -2,12 +2,14 @@ import socket
 import asyncio
 import threading
 import argparse
+import sys
 
 # PING = "*1\r\n$4\r\nping\r\n"
 PONG = "+PONG\r\n"
 OK = "+OK\r\n"
 NULL = "$-1\r\n"
 KEY_VALUES = {}
+ROLE = "master"
 
 # https://redis.io/docs/latest/develop/reference/protocol-spec/#bulk-strings
 def create_bulk_response(msg):
@@ -60,19 +62,28 @@ async def handle_client(client: socket.socket):
                 await loop.sock_sendall(client, data.encode())
             case "info":
                 param = req.decode().split("\r\n")[4]
+                # global ROLE
                 if param == "replication":
-                    await loop.sock_sendall(client, create_bulk_response("# Replication\r\nrole:master").encode())
+                    await loop.sock_sendall(client, create_bulk_response("# Replication\r\nrole:" + ROLE).encode())
 
 
 async def main():
     print("Starting server...")
     parser = argparse.ArgumentParser()
-    parser.add_argument("-p", "--port", type=int, default=6379)
-    args = parser.parse_args()
+    parser.add_argument("-p", "--port", type=int, default=6379, metavar="PORT")
+    parser.add_argument("--replicaof", nargs=2, default="", metavar=("MASTER_HOST", "MASTER_PORT"))
+    args = parser.parse_args(sys.argv[1:])
+
     port = 6379
     if args.port:
         # print(f"port turned on: {args.port}")
         port = args.port
+    
+    if len(args.replicaof) > 0:
+        print(f"replicaof turned on: {args.replicaof}")
+        global ROLE
+        ROLE = "slave"
+
     server = socket.create_server(("localhost", port), reuse_port=False)
     server.setblocking(False)
     server.listen()

@@ -3,6 +3,8 @@ import asyncio
 import threading
 import argparse
 import sys
+import base64
+
 
 PING = "*1\r\n$4\r\nping\r\n"
 PONG = "+PONG\r\n"
@@ -12,6 +14,8 @@ KEY_VALUES = {}
 ROLE = "master"
 REPL_ID = "8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb"
 REPL_OFFSET = 0
+TEMP_RDB = "UkVESVMwMDEx+glyZWRpcy12ZXIFNy4yLjD6CnJlZGlzLWJpdHPAQPoFY3RpbWXCbQi8ZfoIdXNlZC1tZW3CsMQQAPoIYW9mLWJhc2XAAP/wbjv+wP9aog=="
+
 
 # https://redis.io/docs/latest/develop/reference/protocol-spec/#bulk-strings
 def bulk_string(msg):
@@ -30,6 +34,13 @@ def bulk_array(text):
         bulk += "$" + str(len(msg)) + "\r\n" + msg + "\r\n"
     print("bulk", bulk)
     return bulk
+
+
+def bulk_file(data):
+    resp_file = f"${len(data)}".encode() + b"\r\n" + data
+    print("resp_file", resp_file)
+    return resp_file
+
 
 async def count_down(key: str, px: int = None):
     def delete_key():
@@ -81,6 +92,8 @@ async def handle_client(client: socket.socket):
                 await loop.sock_sendall(client, OK.encode())
             case "psync":
                 await loop.sock_sendall(client, bulk_string(f"+FULLRESYNC {REPL_ID} {REPL_OFFSET}\r\n").encode())
+                await loop.sock_sendall(client, bulk_file(base64.b64decode(TEMP_RDB)))
+
             case _:
                 await loop.sock_sendall(client, bulk_string("Command not found").encode())
 
@@ -125,7 +138,7 @@ async def main():
 
             psync = "PSYNC ? -1" # *3\r\n$5\r\nPSYNC\r\n$1\r\n?\r\n$2\r\n-1\r\n
             master_sock.sendall(bulk_array(psync).encode())
-            response = master_sock.recv(1024)
+            # response = master_sock.recv(1024)
             # print("response", response.decode())
         
         # Close connection

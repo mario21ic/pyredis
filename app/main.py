@@ -15,9 +15,9 @@ def main():
             if not data:
                 break
             print(data)
-            if data == PING:
-                conn.sendall(f"{RESPONSE}".encode()) # send data to client
-                print("Response sent")
+            # if data == PING:
+            conn.sendall(f"{RESPONSE}".encode()) # send data to client
+            print("Response sent")
 
 
 if __name__ == "__main__":

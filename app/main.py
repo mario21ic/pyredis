@@ -58,12 +58,16 @@ async def handle_client(client: socket.socket):
                     # print("data not found - sending NULL response")
                     data = NULL
                 await loop.sock_sendall(client, data.encode())
+            case "info":
+                param = req.decode().split("\r\n")[4]
+                if param == "replication":
+                    await loop.sock_sendall(client, create_bulk_response("# Replication\r\nrole:master").encode())
 
 
 async def main():
     print("Starting server...")
     parser = argparse.ArgumentParser()
-    parser.add_argument("--port", type=int, default=6379)
+    parser.add_argument("-p", "--port", type=int, default=6379)
     args = parser.parse_args()
     port = 6379
     if args.port:

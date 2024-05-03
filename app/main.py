@@ -4,6 +4,8 @@ import asyncio
 
 # PING = "*1\r\n$4\r\nping\r\n"
 PONG = "+PONG\r\n"
+OK = "+OK\r\n"
+KEY_VALUES = {}
 
 # https://redis.io/docs/latest/develop/reference/protocol-spec/#bulk-strings
 def create_bulk_response(msg):
@@ -16,12 +18,21 @@ async def handle_client(client: socket.socket):
     loop = asyncio.get_event_loop()
     while req := await loop.sock_recv(client, 1024):
         print(f"received request: {req} - client: {client}")
-        match req.decode().split("\r\n")[2].lower():
+        cmd = req.decode().split("\r\n")[2].lower()
+        match cmd:
             case "ping":
                 await loop.sock_sendall(client, PONG.encode())
             case "echo":
                 msg = req.decode().split("\r\n")[4]
                 await loop.sock_sendall(client, create_bulk_response(msg).encode())
+            case "set":
+                key = req.decode().split("\r\n")[4]
+                value = req.decode().split("\r\n")[6]
+                KEY_VALUES[key] = value
+                print(f"key: {key} - value: {value}")
+                await loop.sock_sendall(client, OK.encode())
+            case "get":
+                await loop.sock_sendall(client, create_bulk_response(KEY_VALUES.get(req.decode().split("\r\n")[4], "")).encode())
 
 
 async def main():
